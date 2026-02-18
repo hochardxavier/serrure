@@ -198,19 +198,29 @@ function handleOrientation(event) {
 
     const target = stepsConfig[currentStep];
 
-    // Vérification sens
-    if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
+// seuil minimum pour considérer un vrai mouvement
+const movementThreshold = 10;
 
-        wrongDirectionCount += Math.abs(delta);
+if (Math.abs(delta) < movementThreshold) {
+    return; // on ignore micro mouvements
+}
 
-        navigator.vibrate && navigator.vibrate(30);
+// Détection mauvais sens
+if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
 
-        if (wrongDirectionCount > wrongTolerance) {
-            resetGame();
-        }
+    wrongDirectionCount += Math.abs(delta);
 
-        return;
+    // vibration légère mais courte
+    navigator.vibrate && navigator.vibrate(20);
+
+    // reset seulement si vrai forçage
+    if (wrongDirectionCount > 40) { // ← augmente la tolérance ici
+        resetGame();
     }
+
+    return;
+}
+
 
     wrongDirectionCount = 0;
     rotation += delta;
@@ -317,6 +327,7 @@ createLocks();
 
 </body>
 </html>
+
 
 
 
