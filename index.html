@@ -37,6 +37,7 @@ body {
 .cadenas {
     font-size: 32px;
     margin: 10px;
+    transition: all 0.3s ease;
 }
 
 button {
@@ -206,7 +207,10 @@ function checkSteps() {
 
 function unlockStep() {
 
-    document.getElementById("lock-" + currentStep).innerText = "🔓";
+    const lock = document.getElementById("lock-" + currentStep);
+	lock.innerText = "🔓";
+	lock.style.color = "#4CAF50";
+	lock.style.transform = "scale(1.2)";
     navigator.vibrate && navigator.vibrate(40);
 
     currentStep++;
