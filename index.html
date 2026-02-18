@@ -207,15 +207,21 @@ function checkSteps() {
 
     // Étape angle
     if (target !== 0) {
-        if (!stepReached && Math.abs(rotation) >= Math.abs(target)) {
-            stepReached = true;
+        if (
+    		(target > 0 && rotation >= target) ||
+    		(target < 0 && rotation <= target)
+			) {
+            	stepReached = true;
         }
 
         // Validation seulement quand on stabilise après avoir atteint l’angle
-        if (stepReached && Math.abs(rotation) < Math.abs(target) - 5) {
-            unlockStep();
-            stepReached = false;
-        }
+        if (
+   			 (target > 0 && rotation >= target) ||
+   			 (target < 0 && rotation <= target)
+			  ) {
+           			 unlockStep();
+           			 stepReached = false;
+       	}
     }
 
     // Étape retour à zéro
@@ -317,4 +323,5 @@ createLocks();
 
 </body>
 </html>
+
 
