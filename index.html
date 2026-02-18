@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Serrure</title>
+
+<style>
+body {
+    margin: 0;
+    background: #0f0f0f;
+    color: #dddddd;
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+#container {
+    padding-top: 40px;
+}
+
+#consigne {
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+#chrono {
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+#serrure {
+    width: 180px;
+    margin: 20px auto;
+}
+
+.cadenas {
+    font-size: 32px;
+    margin: 10px;
+}
+
+button {
+    padding: 10px 20px;
+    background: #222;
+    color: white;
+    border: 1px solid #555;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div id="container">
+    <div id="consigne">La serrure semble grippée. Manipulez-la avec précision.</div>
+    <div id="chrono"></div>
+
+    <!-- Remplace l'image ci-dessous -->
+    <img id="serrure" src="https://via.placeholder.com/180">
+
+    <div id="locks"></div>
+
+    <br>
+    <button id="startBtn">Activer le mécanisme</button>
+</div>
+
+<script>
+
+/* ============================= */
+/*  PARAMÈTRES                   */
+/* ============================= */
+
+function getParams() {
+    const params = new URLSearchParams(window.location.search);
+
+    return {
+        mission: params.get("mission"),
+        group: params.get("group"),
+        config: params.get("config"),
+        time: parseInt(params.get("time")) || 20
+    };
+}
+
+const settings = getParams();
+
+let stepsConfig = settings.config
+    ? settings.config.split("-").map(Number)
+    : [25, 180, 360, 0];
+
+let totalSteps = stepsConfig.length;
+
+/* ============================= */
+/*  VARIABLES GLOBALES           */
+/* ============================= */
+
+let currentStep = 0;
+let timeLeft = settings.time;
+let timer;
+let startAlpha = null;
+let rotation = 0;
+let gameActive = false;
+
+/* ============================= */
+/*  INITIALISATION               */
+/* ============================= */
+
+function createLocks() {
+    const container = document.getElementById("locks");
+    container.innerHTML = "";
+
+    for (let i = 0; i < totalSteps; i++) {
+        const span = document.createElement("span");
+        span.id = "lock-" + i;
+        span.className = "cadenas";
+        span.innerText = "🔒";
+        container.appendChild(span);
+    }
+}
+
+function startTimer() {
+    document.getElementById("chrono").innerText =
+        timeLeft < 10 ? "00:0" + timeLeft : "00:" + timeLeft;
+
+    timer = setInterval(() => {
+
+        if (!gameActive) return;
+
+        timeLeft--;
+
+        document.getElementById("chrono").innerText =
+            timeLeft < 10 ? "00:0" + timeLeft : "00:" + timeLeft;
+
+        if (timeLeft <= 0) {
+            resetGame();
+        }
+
+    }, 1000);
+}
+
+function resetGame() {
+    currentStep = 0;
+    timeLeft = settings.time;
+    rotation = 0;
+    startAlpha = null;
+    gameActive = false;
+
+    clearInterval(timer);
+
+    document.getElementById("consigne").innerText =
+        "La serrure se bloque.";
+
+    createLocks();
+
+    setTimeout(() => {
+        document.getElementById("consigne").innerText =
+            "Manipulez-la avec précision.";
+        document.getElementById("startBtn").style.display = "inline-block";
+    }, 2000);
+}
+
+/* ============================= */
+/*  GYROSCOPE                    */
+/* ============================= */
+
+function handleOrientation(event) {
+
+    if (!gameActive) return;
+
+    let alpha = event.alpha;
+
+    if (startAlpha === null) {
+        startAlpha = alpha;
+        return;
+    }
+
+    let delta = alpha - startAlpha;
+
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+
+    rotation += delta;
+    startAlpha = alpha;
+
+    checkSteps();
+}
+
+function resetRotation() {
+    rotation = 0;
+    startAlpha = null;
+}
+
+function checkSteps() {
+
+    if (currentStep >= totalSteps) return;
+
+    const target = stepsConfig[currentStep];
+
+    if (target !== 0 && Math.abs(rotation) >= Math.abs(target)) {
+        unlockStep();
+    }
+
+    if (target === 0 && Math.abs(rotation) < 10) {
+        unlockStep();
+    }
+}
+
+function unlockStep() {
+
+    document.getElementById("lock-" + currentStep).innerText = "🔓";
+    navigator.vibrate && navigator.vibrate(40);
+
+    currentStep++;
+    resetRotation();
+
+    if (currentStep >= totalSteps) {
+        unlockDoor();
+    }
+}
+
+/* ============================= */
+/*  SUCCÈS                       */
+/* ============================= */
+
+function unlockDoor() {
+
+    gameActive = false;
+    clearInterval(timer);
+
+    document.getElementById("consigne").innerText =
+        "Un déclic profond se fait entendre...";
+
+    setTimeout(() => {
+        window.location.href =
+            `https://tonsite.com/mission/${settings.mission}?group=${settings.group}&unlock=serrure`;
+    }, 1500);
+}
+
+/* ============================= */
+/*  DÉMARRAGE                    */
+/* ============================= */
+
+function initMotion() {
+
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+
+        DeviceOrientationEvent.requestPermission()
+            .then(response => {
+                if (response === 'granted') {
+                    window.addEventListener("deviceorientation", handleOrientation);
+                }
+            });
+
+    } else {
+        window.addEventListener("deviceorientation", handleOrientation);
+    }
+}
+
+function startGame() {
+
+    document.getElementById("startBtn").style.display = "none";
+    document.getElementById("consigne").innerText = "";
+
+    gameActive = true;
+    startTimer();
+    initMotion();
+}
+
+document.getElementById("startBtn")
+    .addEventListener("click", startGame);
+
+createLocks();
+
+</script>
+
+</body>
+</html>
