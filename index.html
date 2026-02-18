@@ -90,6 +90,9 @@ let stepsConfig = settings.config
 
 let totalSteps = stepsConfig.length;
 
+let stepReached = false;
+let zeroStableStart = null;
+
 /* ============================= */
 /*  VARIABLES GLOBALES           */
 /* ============================= */
@@ -196,13 +199,36 @@ function checkSteps() {
 
     const target = stepsConfig[currentStep];
 
-    if (target !== 0 && Math.abs(rotation) >= Math.abs(target)) {
-        unlockStep();
+    // Étape angle
+    if (target !== 0) {
+        if (!stepReached && Math.abs(rotation) >= Math.abs(target)) {
+            stepReached = true;
+        }
+
+        // Validation seulement quand on stabilise après avoir atteint l’angle
+        if (stepReached && Math.abs(rotation) < Math.abs(target) - 5) {
+            unlockStep();
+            stepReached = false;
+        }
     }
 
-    if (target === 0 && Math.abs(rotation) < 10) {
-        unlockStep();
-    }
+    // Étape retour à zéro
+    if (target === 0) {
+
+    if (Math.abs(rotation) < 5) {
+        if (!zeroStableStart) {
+            zeroStableStart = Date.now();
+        }
+
+        if (Date.now() - zeroStableStart > 500) {
+            unlockStep();
+            zeroStableStart = null;
+        }
+
+       } else {
+          zeroStableStart = null;
+       }
+   }
 }
 
 function unlockStep() {
