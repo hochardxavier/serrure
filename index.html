@@ -199,7 +199,7 @@ function handleOrientation(event) {
     const target = stepsConfig[currentStep];
 
 // seuil minimum pour considérer un vrai mouvement
-const movementThreshold = 10;
+const movementThreshold = 3;
 
 if (Math.abs(delta) < movementThreshold) {
     return; // on ignore micro mouvements
@@ -214,7 +214,7 @@ if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
     navigator.vibrate && navigator.vibrate(20);
 
     // reset seulement si vrai forçage
-    if (wrongDirectionCount > 40) { // ← augmente la tolérance ici
+    if (wrongDirectionCount > 90) { // ← augmente la tolérance ici
         resetGame();
     }
 
@@ -327,6 +327,7 @@ createLocks();
 
 </body>
 </html>
+
 
 
 
