@@ -63,6 +63,8 @@ button {
 
     <br>
     <button id="startBtn">Activer le mécanisme</button>
+	<audio id="clickSound" src="click.mp3" preload="auto"></audio>
+
 </div>
 
 <script>
@@ -97,6 +99,8 @@ let zeroStableStart = null;
 /*  VARIABLES GLOBALES           */
 /* ============================= */
 
+let wrongDirectionCount = 0;
+const wrongTolerance = 15; // degrés autorisés dans mauvais sens
 let currentStep = 0;
 let timeLeft = settings.time;
 let timer;
@@ -141,6 +145,12 @@ function startTimer() {
     }, 1000);
 }
 
+function playClickSound() {
+    const sound = document.getElementById("clickSound");
+    sound.currentTime = 0;
+    sound.play();
+}
+
 function resetGame() {
     currentStep = 0;
     timeLeft = settings.time;
@@ -172,26 +182,43 @@ function handleOrientation(event) {
 
     if (!gameActive) return;
 
-    currentAlpha = event.alpha; // sauvegarde position réelle
+    let alpha = event.alpha;
 
     if (startAlpha === null) {
-        startAlpha = currentAlpha;
+        startAlpha = alpha;
         return;
     }
 
-    let delta = currentAlpha - startAlpha;
+    let delta = alpha - startAlpha;
 
     if (delta > 180) delta -= 360;
     if (delta < -180) delta += 360;
 
-    if (Math.abs(delta) > 1) {
-        rotation += delta;
+    if (Math.abs(delta) < 1) return;
+
+    const target = stepsConfig[currentStep];
+
+    // Vérification sens
+    if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
+
+        wrongDirectionCount += Math.abs(delta);
+
+        navigator.vibrate && navigator.vibrate(30);
+
+        if (wrongDirectionCount > wrongTolerance) {
+            resetGame();
+        }
+
+        return;
     }
 
-    startAlpha = currentAlpha;
+    wrongDirectionCount = 0;
+    rotation += delta;
+    startAlpha = alpha;
 
     checkSteps();
 }
+
 
 
 function resetRotation() {
@@ -205,57 +232,23 @@ function checkSteps() {
 
     const target = stepsConfig[currentStep];
 
-    // Étape angle
-    if (target !== 0) {
-        if (
-    		(target > 0 && rotation >= target) ||
-    		(target < 0 && rotation <= target)
-			) {
-            	stepReached = true;
-        }
-
-        // Validation seulement quand on stabilise après avoir atteint l’angle
-        if (
-   			 (target > 0 && rotation >= target) ||
-   			 (target < 0 && rotation <= target)
-			  ) {
-           			 unlockStep();
-           			 stepReached = false;
-       	}
+    if (
+        (target > 0 && rotation >= target) ||
+        (target < 0 && rotation <= target)
+    ) {
+        unlockStep();
     }
-
-    // Étape retour à zéro
-    if (target === 0) {
-
-    // On considère que 0° correspond à alpha proche de 0 ou 360
-    let nearZero =
-        (currentAlpha < 10 || currentAlpha > 350);
-
-    if (nearZero) {
-
-        if (!zeroStableStart) {
-            zeroStableStart = Date.now();
-        }
-
-        if (Date.now() - zeroStableStart > 500) {
-            unlockStep();
-            zeroStableStart = null;
-        }
-
-     } else {
-        zeroStableStart = null;
-         }
-    }
-
 }
+
 
 function unlockStep() {
 
     const lock = document.getElementById("lock-" + currentStep);
-	lock.innerText = "🔓";
-	lock.style.color = "#4CAF50";
-	lock.style.transform = "scale(1.2)";
-    navigator.vibrate && navigator.vibrate(40);
+    lock.innerText = "🔓";
+    lock.style.color = "#4CAF50";
+    lock.style.transform = "scale(1.2)";
+
+    playClickSound();
 
     currentStep++;
     resetRotation();
@@ -264,6 +257,7 @@ function unlockStep() {
         unlockDoor();
     }
 }
+
 
 /* ============================= */
 /*  SUCCÈS                       */
@@ -323,5 +317,6 @@ createLocks();
 
 </body>
 </html>
+
 
 
