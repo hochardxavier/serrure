@@ -86,9 +86,9 @@ function getParams() {
 
 const settings = getParams();
 
-let stepsConfig = settings.config
-    ? settings.config.split("-").map(Number)
-    : [25, 180, 360, 0];
+stepsConfig = settings.config
+    ? settings.config.split(",").map(v => parseInt(v.trim()))
+    : [25, 180, -360];
 
 let totalSteps = stepsConfig.length;
 
@@ -327,6 +327,7 @@ createLocks();
 
 </body>
 </html>
+
 
 
 
