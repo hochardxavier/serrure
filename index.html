@@ -100,7 +100,7 @@ let zeroStableStart = null;
 /* ============================= */
 
 let wrongDirectionCount = 0;
-const wrongTolerance = 45; // degrés autorisés dans mauvais sens
+const wrongTolerance = 10; // degrés autorisés dans mauvais sens
 let currentStep = 0;
 let timeLeft = settings.time;
 let timer;
@@ -214,7 +214,7 @@ if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
     navigator.vibrate && navigator.vibrate(20);
 
     // reset seulement si vrai forçage
-    if (wrongDirectionCount > 40) { // ← augmente la tolérance ici
+    if (wrongDirectionCount > 60) { // ← augmente la tolérance ici
         resetGame();
     }
 
@@ -327,6 +327,7 @@ createLocks();
 
 </body>
 </html>
+
 
 
 
