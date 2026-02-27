@@ -63,6 +63,8 @@ button {
 
     <br>
     <button id="startBtn">Activer le mécanisme</button>
+	<br>
+	<button id="testBtn">test lien</button>
 	<audio id="clickSound" src="Clic.mp3" preload="auto"></audio>
 
 </div>
@@ -323,10 +325,29 @@ document.getElementById("startBtn")
 
 createLocks();
 
+	//////////
+	document.getElementById("debugUnlockBtn")
+  .addEventListener("click", function () {
+
+    if (!settings.group) {
+      alert("Aucun group détecté dans l'URL.");
+      return;
+    }
+
+    const debugUrl =
+      `https://hochardxavier5.wixsite.com/scl-v1/17-avocat-int?group=${settings.group}&unlock=serrure`;
+
+    console.log("Redirection DEBUG vers :", debugUrl);
+
+    window.location.href = debugUrl;
+	});
+	/////////////
+
 </script>
 
 </body>
 </html>
+
 
 
 
