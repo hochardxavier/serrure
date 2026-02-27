@@ -88,6 +88,24 @@ function getParams() {
 
 const settings = getParams();
 
+		//////////
+	document.getElementById("debugUnlockBtn")
+  .addEventListener("click", function () {
+
+    if (!settings.group) {
+      alert("Aucun group détecté dans l'URL.");
+      return;
+    }
+
+    const debugUrl =
+      `https://hochardxavier5.wixsite.com/scl-v1/17-avocat-int?group=${settings.group}&unlock=serrure`;
+
+    console.log("Redirection DEBUG vers :", debugUrl);
+
+    window.location.href = debugUrl;
+	});
+	/////////////
+
 stepsConfig = settings.config
     ? settings.config.split(",").map(v => parseInt(v.trim()))
     : [25, 180, -360];
@@ -325,28 +343,13 @@ document.getElementById("startBtn")
 
 createLocks();
 
-	//////////
-	document.getElementById("debugUnlockBtn")
-  .addEventListener("click", function () {
 
-    if (!settings.group) {
-      alert("Aucun group détecté dans l'URL.");
-      return;
-    }
-
-    const debugUrl =
-      `https://hochardxavier5.wixsite.com/scl-v1/17-avocat-int?group=${settings.group}&unlock=serrure`;
-
-    console.log("Redirection DEBUG vers :", debugUrl);
-
-    window.location.href = debugUrl;
-	});
-	/////////////
 
 </script>
 
 </body>
 </html>
+
 
 
 
