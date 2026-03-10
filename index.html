@@ -82,7 +82,8 @@ function getParams() {
         mission: params.get("mission"),
         group: params.get("group"),
         config: params.get("config"),
-        time: parseInt(params.get("time")) || 20
+        time: parseInt(params.get("time")) || 20,
+		returnPage: params.get("return")
     };
 }
 
@@ -302,8 +303,18 @@ function unlockDoor() {
         "Un déclic profond se fait entendre...";
 
     setTimeout(() => {
-        window.location.href =
-            `https://hochardxavier5.wixsite.com/scl-v1/17-avocat-int?group=${settings.group}&unlock=serrure`;
+        let destination = "";
+
+		if(settings.returnPage === "avocat"){
+    		destination = "17-avocat-int";
+		}
+
+		if(settings.returnPage === "journaliste"){
+    		destination = "17-journaliste-int";
+		}
+
+		window.location.href =
+		`https://hochardxavier5.wixsite.com/scl-v1/${destination}?group=${settings.group}&unlock=serrure`;
     }, 1500);
 }
 
@@ -349,6 +360,7 @@ createLocks();
 
 </body>
 </html>
+
 
 
 
