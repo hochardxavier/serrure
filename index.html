@@ -101,9 +101,8 @@ const settings = getParams();
     const url = new URL(settings.callback);
 
     url.searchParams.set("group", settings.group);
-    url.searchParams.set("unlock", settings.step);
-
-    console.log("Redirection DEBUG vers :", url.toString());
+    url.searchParams.set("unlock", settings.unlock);
+	url.searchParams.set("target", settings.target); // 👈 IMPORTANT
 
     window.location.href = url.toString();
 });
