@@ -83,14 +83,16 @@ function getParams() {
         group: params.get("group"),
         config: params.get("config"),
         time: parseInt(params.get("time")) || 20,
-		returnPage: params.get("return")
+        callback: params.get("callback"),   // 👈 AJOUT
+        target: params.get("target"),       // 👈 AJOUT
+        unlock: params.get("unlock")        // 👈 AJOUT
     };
 }
 
 const settings = getParams();
 
 		//////////
-	document.getElementById("debugUnlockBtn")
+document.getElementById("debugUnlockBtn")
   .addEventListener("click", function () {
 
     if (!settings.group) {
@@ -102,7 +104,7 @@ const settings = getParams();
 
     url.searchParams.set("group", settings.group);
     url.searchParams.set("unlock", settings.unlock);
-	url.searchParams.set("target", settings.target); // 👈 IMPORTANT
+    url.searchParams.set("target", settings.target);
 
     window.location.href = url.toString();
 });
