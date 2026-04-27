@@ -98,28 +98,15 @@ const settings = getParams();
       return;
     }
 
-    ///// test modification retour url ////
-    let destination = "";
-    let serrure ="";
+    const url = new URL(settings.callback);
 
-	if(settings.returnPage === "avocat"){
-    	destination = "17-avocat-int";
-        serrure = "serrureAvocat";
-	}
+    url.searchParams.set("group", settings.group);
+    url.searchParams.set("unlock", settings.step);
 
-	if(settings.returnPage === "journaliste"){
-    	destination = "17-journaliste-int";
-        serrure = "serrureJournaliste";
-	}
-    /////////////fin de test /////////////
+    console.log("Redirection DEBUG vers :", url.toString());
 
-    const debugUrl =
-      `https://hochardxavier5.wixsite.com/scl-v1/${destination}?group=${settings.group}&unlock=${serrure}`;
-
-    console.log("Redirection DEBUG vers :", debugUrl);
-
-    window.location.href = debugUrl;
-	});
+    window.location.href = url.toString();
+});
 	/////////////
 
 stepsConfig = settings.config
@@ -309,7 +296,7 @@ function unlockStep() {
 /*  SUCCÈS                       */
 /* ============================= */
 
-function unlockDoor() {
+/*function unlockDoor() {
 
     gameActive = false;
     clearInterval(timer);
@@ -318,7 +305,7 @@ function unlockDoor() {
         "Un déclic profond se fait entendre...";
 
     setTimeout(() => {
-        /*let destination = "";
+        let destination = "";
 
 		if(settings.returnPage === "avocat"){
     		destination = "17-avocat-int";
@@ -326,11 +313,25 @@ function unlockDoor() {
 
 		if(settings.returnPage === "journaliste"){
     		destination = "17-journaliste-int";
-		}*/
+		}
 
 		window.location.href =
 		`https://hochardxavier5.wixsite.com/scl-v1/${destination}?group=${settings.group}&unlock=${serrure}`;
     }, 1500);
+}*/
+
+function unlockDoor() {
+
+    gameActive = false;
+    clearInterval(timer);
+
+    const url = new URL(settings.callback);
+
+    url.searchParams.set("group", settings.group);
+    url.searchParams.set("unlock", settings.unlock);
+	url.searchParams.set("target", settings.target); // 👈 IMPORTANT
+
+    window.location.href = url.toString();
 }
 
 /* ============================= */
