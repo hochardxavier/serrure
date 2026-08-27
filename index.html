@@ -105,6 +105,7 @@ document.getElementById("debugUnlockBtn")
     url.searchParams.set("group", settings.group);
     url.searchParams.set("unlock", settings.unlock);
     url.searchParams.set("target", settings.target);
+	url.searchParams.set("scene",settings.target);
 
     window.location.href = url.toString();
 });
