@@ -106,7 +106,7 @@ document.getElementById("debugUnlockBtn")
     url.searchParams.set("group", settings.group);
     url.searchParams.set("unlock", settings.unlock);
     url.searchParams.set("target", settings.target);
-	url.searchParams.set("scene",settings.target);
+	url.searchParams.set("scene",settings.scene);
 
     window.location.href = url.toString();
 });
@@ -333,6 +333,7 @@ function unlockDoor() {
     url.searchParams.set("group", settings.group);
     url.searchParams.set("unlock", settings.unlock);
 	url.searchParams.set("target", settings.target); // 👈 IMPORTANT
+	url.searchParams.set("scene", settings.scene);
 
     window.location.href = url.toString();
 }
