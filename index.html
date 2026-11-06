@@ -55,6 +55,39 @@ button {
     cursor: pointer;
 }
 
+/* Affichage des angles */
+#angleDisplay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 25px;
+    margin: 15px auto;
+    padding: 12px;
+    max-width: 300px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+}
+
+.angleValue {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 90px;
+}
+
+.angleValue span {
+    font-size: 11px;
+    opacity: 0.7;
+    letter-spacing: 1px;
+}
+
+.angleValue strong {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
 </style>
 </head>
 
@@ -86,6 +119,21 @@ button {
     <button id="startBtn">
         Activer le mécanisme
     </button>
+
+    <br>
+
+    <!-- Affichage des angles -->
+        <div id="angleDisplay">
+            <div class="angleValue">
+                <span>OBJECTIF</span>
+                <strong id="objectiveAngle">0°</strong>
+            </div>
+
+            <div class="angleValue">
+                <span>MESURE</span>
+                <strong id="measuredAngle">0°</strong>
+            </div>
+        </div>
 
     <br>
 
@@ -160,6 +208,23 @@ function getParams() {
 
     };
 
+}
+
+// Actualisation de l'affichage des angles
+function updateAngleDisplay() {
+
+    const objectiveElement = document.getElementById("objectiveAngle");
+    const measuredElement = document.getElementById("measuredAngle");
+
+    // Angle objectif du cadenas actuel
+    const objective = stepsConfig[currentStep];
+
+    // Affichage de l'objectif
+    objectiveElement.textContent =
+        objective !== undefined ? `${objective}°` : "--";
+
+    // Affichage de la rotation mesurée
+    measuredElement.textContent = `${Math.round(rotation)}°`;
 }
 
 
@@ -667,6 +732,9 @@ function endGame(reason) {
     // Réinitialisation de toutes les variables de tentative
     resetAttemptVariables();
 
+  //
+  updateAngleDisplay();
+
 
     // Réinitialisation de l'affichage des cadenas
     createLocks();
@@ -1107,6 +1175,9 @@ function handleOrientation(event) {
     // Ajout de la rotation correcte
     rotation += delta;
 
+  //
+  updateAngleDisplay();
+
 
     // Actualisation de la référence
     startAlpha = alpha;
@@ -1245,6 +1316,9 @@ function unlockStep() {
 
 
     resetRotation();
+
+  //
+  updateAngleDisplay();
 
 }
 
@@ -1445,6 +1519,9 @@ async function startGame() {
 
     // Réinitialisation des variables de tentative
     resetAttemptVariables();
+
+  //
+  updateAngleDisplay();
 
 
     // Réinitialisation de l'affichage des cadenas
@@ -1679,6 +1756,9 @@ function initGame() {
 
     // Initialisation des variables
     resetAttemptVariables();
+
+  //
+  updateAngleDisplay();
 
 
     // Création des cadenas
