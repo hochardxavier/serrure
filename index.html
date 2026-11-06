@@ -240,7 +240,7 @@ if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
     navigator.vibrate && navigator.vibrate(20);
 
     // reset seulement si vrai forçage
-    if (wrongDirectionCount > 60) { // ← augmente la tolérance ici
+    if (wrongDirectionCount > 10) { // ← augmente la tolérance ici
         resetGame();
     }
 
