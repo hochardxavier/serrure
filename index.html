@@ -126,7 +126,7 @@ let zeroStableStart = null;
 /* ============================= */
 
 let wrongDirectionCount = 0;
-const wrongTolerance = 20; // degrés autorisés dans mauvais sens
+const wrongTolerance = 10; // degrés autorisés dans mauvais sens
 let currentStep = 0;
 let timeLeft = settings.time;
 let timer;
@@ -182,7 +182,6 @@ function resetGame() {
     timeLeft = settings.time;
     rotation = 0;
     startAlpha = null;
-	wrongDirectionCount = 0;
     gameActive = false;
 
     clearInterval(timer);
@@ -237,12 +236,11 @@ if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
 
     wrongDirectionCount += Math.abs(delta);
 
-    // Mise à jour de la position de référence
-    startAlpha = alpha;
-
+    // vibration légère mais courte
     navigator.vibrate && navigator.vibrate(20);
 
-    if (wrongDirectionCount > wrongTolerance) {
+    // reset seulement si vrai forçage
+    if (wrongDirectionCount > 60) { // ← augmente la tolérance ici
         resetGame();
     }
 
@@ -262,7 +260,6 @@ if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
 function resetRotation() {
     rotation = 0;
     startAlpha = null;
-	wrongDirectionCount = 0;
 }
 
 function checkSteps() {
@@ -383,7 +380,6 @@ createLocks();
 
 </body>
 </html>
-
 
 
 
