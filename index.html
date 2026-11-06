@@ -1,12 +1,19 @@
+
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Serrure</title>
+<title>Serrure SCL</title>
 
 <style>
+
+/* ================================================= */
+/* 1. APPARENCE GÉNÉRALE                            */
+/* ================================================= */
+
 body {
     margin: 0;
     background: #0f0f0f;
@@ -47,354 +54,1661 @@ button {
     border: 1px solid #555;
     cursor: pointer;
 }
+
 </style>
 </head>
+
 
 <body>
 
 <div id="container">
-    <div id="consigne">La serrure semble grippée. Manipulez-la avec précision.</div>
+
+    <!-- Consigne destinée au joueur -->
+    <div id="consigne">
+        La serrure semble grippée. Manipulez-la avec précision.
+    </div>
+
+    <!-- Chronomètre -->
     <div id="chrono"></div>
 
-    <!-- Remplace l'image ci-dessous -->
-    <img id="serrure" src="https://static.wixstatic.com/media/fe8a67_9fa99af912bd4c0b9bdfdf71694510a0~mv2.webp">
+    <!-- Image de la serrure -->
+    <img
+        id="serrure"
+        src="https://static.wixstatic.com/media/fe8a67_9fa99af912bd4c0b9bdfdf71694510a0~mv2.webp"
+    >
 
+    <!-- Conteneur des cadenas -->
     <div id="locks"></div>
 
     <br>
-    <button id="startBtn">Activer le mécanisme</button>
-	<br>
-	<button id="debugUnlockBtn">test lien</button>
-	<audio id="clickSound" src="Clic.mp3" preload="auto"></audio>
+
+    <!-- Bouton de démarrage -->
+    <button id="startBtn">
+        Activer le mécanisme
+    </button>
+
+    <br>
+
+    <!-- Bouton de test du callback Wix -->
+    <button id="debugUnlockBtn">
+        test lien
+    </button>
+
+    <!-- Son joué lors du déverrouillage -->
+    <audio id="clickSound" src="Clic.mp3" preload="auto"></audio>
 
 </div>
 
+
 <script>
 
-/* ============================= */
-/*  PARAMÈTRES                   */
-/* ============================= */
+/* ================================================= */
+/* 2. PARAMÈTRES URL                                */
+/* ================================================= */
+
+/*
+   Les paramètres sont transmis par la page Wix.
+
+   mission  : identifiant de mission
+   group    : identifiant de l'équipe
+   config   : séquence des rotations
+   time     : durée maximale de la tentative
+   callback : adresse de retour vers Wix
+   target   : cible à débloquer
+   unlock   : identifiant du déverrouillage
+   scene    : scène de destination
+
+   Les paramètres sont lus une seule fois.
+
+   Ils ne sont jamais modifiés pendant les tentatives.
+*/
+
 
 function getParams() {
+
     const params = new URLSearchParams(window.location.search);
 
+    // Lecture de la durée.
+    // Une valeur absente, invalide ou inférieure à 1
+    // entraîne l'utilisation de 20 secondes.
+
+    const rawTime = Number(params.get("time"));
+
+    const validTime =
+        Number.isInteger(rawTime) && rawTime > 0
+            ? rawTime
+            : 20;
+
+
     return {
+
         mission: params.get("mission"),
+
         group: params.get("group"),
+
         config: params.get("config"),
-        time: parseInt(params.get("time")) || 20,
-        callback: params.get("callback"),   // 👈 AJOUT
-        target: params.get("target"),       // 👈 AJOUT
-        unlock: params.get("unlock"),		// 👈 AJOUT
-		scene: params.get("scene")         // 👈 AJOUT
+
+        time: validTime,
+
+        callback: params.get("callback"),
+
+        target: params.get("target"),
+
+        unlock: params.get("unlock"),
+
+        scene: params.get("scene")
+
     };
+
 }
 
+
+// Chargement des paramètres
 const settings = getParams();
 
-		//////////
-document.getElementById("debugUnlockBtn")
-  .addEventListener("click", function () {
 
-    if (!settings.group) {
-      alert("Aucun group détecté dans l'URL.");
-      return;
+/* ================================================= */
+/* 3. CONFIGURATION DE LA SERRURE                   */
+/* ================================================= */
+
+/*
+   La configuration détermine les rotations nécessaires
+   pour ouvrir les différents cadenas.
+
+   Exemple :
+
+   25,180,-360
+
+   Cadenas 1 : +25 degrés
+   Cadenas 2 : +180 degrés
+   Cadenas 3 : -360 degrés
+
+   Si la configuration est absente ou invalide,
+   on utilise la configuration par défaut.
+
+   Une valeur nulle n'est pas autorisée car elle
+   ne représente aucune direction de rotation.
+*/
+
+
+const DEFAULT_CONFIG = [25, 180, -360];
+
+function getStepsConfig(value) {
+
+    if (!value) {
+
+        return [...DEFAULT_CONFIG];
+
     }
 
-    const url = new URL(settings.callback);
+    const values = value.split(",").map(v => {
 
-    url.searchParams.set("group", settings.group);
-    url.searchParams.set("unlock", settings.unlock);
-    url.searchParams.set("target", settings.target);
-	url.searchParams.set("scene",settings.scene);
+        return Number(v.trim());
 
-    window.location.href = url.toString();
-});
-	/////////////
+    });
 
-stepsConfig = settings.config
-    ? settings.config.split(",").map(v => parseInt(v.trim()))
-    : [25, 180, -360];
 
-let totalSteps = stepsConfig.length;
+    // Vérification de toutes les valeurs.
+    // Si une seule est invalide, toute la configuration
+    // revient à sa valeur par défaut.
 
-let stepReached = false;
-let zeroStableStart = null;
+    const valid =
 
-/* ============================= */
-/*  VARIABLES GLOBALES           */
-/* ============================= */
+        values.length > 0 &&
 
-let wrongDirectionCount = 0;
-const wrongTolerance = 10; // degrés autorisés dans mauvais sens
-let currentStep = 0;
-let timeLeft = settings.time;
-let timer;
-let startAlpha = null;
-let rotation = 0;
-let gameActive = false;
+        values.every(v =>
+            Number.isFinite(v) &&
+            Number.isInteger(v) &&
+            v !== 0
+        );
 
-/* ============================= */
-/*  INITIALISATION               */
-/* ============================= */
 
-function createLocks() {
-    const container = document.getElementById("locks");
-    container.innerHTML = "";
+    return valid ? values : [...DEFAULT_CONFIG];
 
-    for (let i = 0; i < totalSteps; i++) {
-        const span = document.createElement("span");
-        span.id = "lock-" + i;
-        span.className = "cadenas";
-        span.innerText = "🔒";
-        container.appendChild(span);
-    }
 }
 
-function startTimer() {
-    document.getElementById("chrono").innerText =
-        timeLeft < 10 ? "00:0" + timeLeft : "00:" + timeLeft;
 
+// Configuration définitive de la serrure
+const stepsConfig = getStepsConfig(settings.config);
+
+
+// Nombre de cadenas
+const totalSteps = stepsConfig.length;
+
+
+/* ================================================= */
+/* 4. PARAMÈTRES DE JEU                             */
+/* ================================================= */
+
+/*
+   Ces paramètres définissent les règles de la serrure.
+
+   movementThreshold :
+   Seuil minimum de mouvement pris en compte.
+
+   wrongTolerance :
+   Tolérance maximale de mouvement dans le mauvais sens.
+*/
+
+
+const movementThreshold = 10;
+
+const wrongTolerance = 30;
+
+
+/* ================================================= */
+/* 5. ÉTATS DU JEU                                  */
+/* ================================================= */
+
+/*
+   Le jeu utilise quatre états.
+
+   ready   : attente du joueur
+   playing : partie en cours
+   failed  : échec et réinitialisation
+   success : serrure ouverte et callback
+
+   Cette machine à états empêche les fonctions
+   de se déclencher dans un état inapproprié.
+*/
+
+
+let gameState = "ready";
+
+
+/* ================================================= */
+/* 6. VARIABLES DE LA PARTIE                        */
+/* ================================================= */
+
+/*
+   Ces variables évoluent pendant une tentative.
+
+   Elles sont réinitialisées avant chaque nouvelle partie
+   et après chaque échec.
+*/
+
+
+// Numéro du cadenas actuellement traité
+let currentStep = 0;
+
+
+// Temps restant
+let timeLeft = settings.time;
+
+
+// Rotation cumulée du cadenas actuel
+let rotation = 0;
+
+
+// Orientation de référence du gyroscope
+let startAlpha = null;
+
+
+// Cumul des mouvements dans le mauvais sens
+let wrongDirectionCount = 0;
+
+
+// Indique si le gyroscope a fourni une première mesure
+let sensorReady = false;
+
+
+// Motif du dernier échec
+let lastFailureReason = null;
+
+
+/* ================================================= */
+/* 7. VARIABLES TECHNIQUES                          */
+/* ================================================= */
+
+/*
+   Ces variables servent à gérer les événements
+   et les temporisations.
+
+   Elles ne représentent pas la progression du jeu.
+*/
+
+
+// Identifiant du chronomètre
+let timer = null;
+
+
+// Identifiant du délai de réinitialisation
+let resetTimeout = null;
+
+
+// Délai maximum d'attente du gyroscope
+let sensorTimeout = null;
+
+
+// Indique si l'écouteur du gyroscope est enregistré
+let orientationListenerRegistered = false;
+
+
+// Indique si une demande d'autorisation est en cours
+let motionInitializationPending = false;
+
+
+// Empêche plusieurs redirections simultanées
+let callbackTriggered = false;
+
+
+// Indique si une erreur de capteur a déjà été traitée
+let sensorFailureHandled = false;
+
+
+/* ================================================= */
+/* 8. RÉFÉRENCES AUX ÉLÉMENTS HTML                   */
+/* ================================================= */
+
+/*
+   On récupère les éléments HTML une seule fois
+   pour éviter de les rechercher à chaque événement.
+*/
+
+
+const consigneElement = document.getElementById("consigne");
+
+const chronoElement = document.getElementById("chrono");
+
+const locksElement = document.getElementById("locks");
+
+const startButton = document.getElementById("startBtn");
+
+const debugButton = document.getElementById("debugUnlockBtn");
+
+const clickSound = document.getElementById("clickSound");
+
+
+/* ================================================= */
+/* 9. AFFICHAGE DU CHRONOMÈTRE                      */
+/* ================================================= */
+
+/*
+   Formate le temps restant sous la forme :
+
+   00:20
+   00:09
+   00:01
+   00:00
+*/
+
+
+function updateChronoDisplay() {
+
+    const minutes = Math.floor(timeLeft / 60);
+
+    const seconds = timeLeft % 60;
+
+    const formattedMinutes = String(minutes).padStart(2, "0");
+
+    const formattedSeconds = String(seconds).padStart(2, "0");
+
+    chronoElement.innerText =
+        formattedMinutes + ":" + formattedSeconds;
+
+}
+
+
+/* ================================================= */
+/* 10. GESTION DES CADENAS                          */
+/* ================================================= */
+
+/*
+   Génère les cadenas en fonction de la configuration.
+
+   Chaque cadenas est initialement fermé.
+*/
+
+
+function createLocks() {
+
+    locksElement.innerHTML = "";
+
+
+    for (let i = 0; i < totalSteps; i++) {
+
+        const span = document.createElement("span");
+
+        span.id = "lock-" + i;
+
+        span.className = "cadenas";
+
+        span.innerText = "🔒";
+
+        locksElement.appendChild(span);
+
+    }
+
+}
+
+
+/* ================================================= */
+/* 11. RÉINITIALISATION DES VARIABLES               */
+/* ================================================= */
+
+/*
+   Cette fonction remet à zéro les variables
+   qui appartiennent à une tentative.
+
+   Elle ne modifie jamais les paramètres URL.
+
+   Elle ne démarre pas le jeu.
+*/
+
+
+function resetAttemptVariables() {
+
+    currentStep = 0;
+
+    timeLeft = settings.time;
+
+    rotation = 0;
+
+    startAlpha = null;
+
+    wrongDirectionCount = 0;
+
+    sensorReady = false;
+
+    sensorFailureHandled = false;
+
+}
+
+
+/* ================================================= */
+/* 12. ARRÊT DES TEMPORISATIONS                     */
+/* ================================================= */
+
+/*
+   Arrête tous les mécanismes temporels.
+
+   Cette fonction est utilisée lors d'un échec
+   ou d'une réussite.
+*/
+
+
+function stopTimers() {
+
+    // Arrêt du chronomètre
+    clearInterval(timer);
+
+    timer = null;
+
+
+    // Arrêt du délai de réinitialisation
+    clearTimeout(resetTimeout);
+
+    resetTimeout = null;
+
+
+    // Arrêt du délai de surveillance du gyroscope
+    clearTimeout(sensorTimeout);
+
+    sensorTimeout = null;
+
+}
+
+
+/* ================================================= */
+/* 13. CHRONOMÈTRE                                  */
+/* ================================================= */
+
+/*
+   Le chronomètre démarre immédiatement après
+   le clic sur START.
+
+   Il continue entre les différents cadenas.
+
+   Il est arrêté uniquement en cas d'échec
+   ou de réussite.
+*/
+
+
+function startTimer() {
+
+    // Protection contre les chronomètres multiples
+    clearInterval(timer);
+
+    timer = null;
+
+
+    // Affichage initial
+    updateChronoDisplay();
+
+
+    // Démarrage du décompte
     timer = setInterval(() => {
 
-        if (!gameActive) return;
 
+        // Aucun traitement si la partie n'est plus active
+        if (gameState !== "playing") {
+
+            return;
+
+        }
+
+
+        // Décrémentation
         timeLeft--;
 
-        document.getElementById("chrono").innerText =
-            timeLeft < 10 ? "00:0" + timeLeft : "00:" + timeLeft;
 
+        // Mise à jour de l'affichage
+        updateChronoDisplay();
+
+
+        // Échec lorsque le temps atteint zéro
         if (timeLeft <= 0) {
-            resetGame();
+
+            endGame("timeout");
+
         }
 
     }, 1000);
+
 }
+
+
+/* ================================================= */
+/* 14. GESTION DU SON                               */
+/* ================================================= */
+
+/*
+   Joue le son de validation d'un cadenas.
+
+   Une erreur de lecture audio ne doit jamais
+   interrompre le fonctionnement du jeu.
+*/
+
 
 function playClickSound() {
-    const sound = document.getElementById("clickSound");
-    sound.currentTime = 0;
-    sound.play();
-}
 
-function resetGame() {
-    currentStep = 0;
-    timeLeft = settings.time;
-    rotation = 0;
-    startAlpha = null;
-    gameActive = false;
+    clickSound.currentTime = 0;
 
-    clearInterval(timer);
+    clickSound.play().catch(error => {
 
-    document.getElementById("consigne").innerText =
-        "La serrure se bloque.";
+        console.warn("Lecture audio impossible :", error);
 
-    createLocks();
+    });
 
-    setTimeout(() => {
-        document.getElementById("consigne").innerText =
-            "Manipulez-la avec précision.";
-        document.getElementById("startBtn").style.display = "inline-block";
-    }, 2000);
-}
-
-/* ============================= */
-/*  GYROSCOPE                    */
-/* ============================= */
-
-let currentAlpha = 0;
-
-function handleOrientation(event) {
-
-    if (!gameActive) return;
-
-    let alpha = event.alpha;
-
-    if (startAlpha === null) {
-        startAlpha = alpha;
-        return;
-    }
-
-    let delta = alpha - startAlpha;
-
-    if (delta > 180) delta -= 360;
-    if (delta < -180) delta += 360;
-
-    if (Math.abs(delta) < 1) return;
-
-    const target = stepsConfig[currentStep];
-
-// seuil minimum pour considérer un vrai mouvement
-const movementThreshold = 10;
-
-if (Math.abs(delta) < movementThreshold) {
-    return; // on ignore micro mouvements
-}
-
-// Détection mauvais sens
-if ((target > 0 && delta < 0) || (target < 0 && delta > 0)) {
-
-    wrongDirectionCount += Math.abs(delta);
-
-    // vibration légère mais courte
-    navigator.vibrate && navigator.vibrate(20);
-
-    // reset seulement si vrai forçage
-    if (wrongDirectionCount > 60) { // ← augmente la tolérance ici
-        resetGame();
-    }
-
-    return;
 }
 
 
-    wrongDirectionCount = 0;
-    rotation += delta;
-    startAlpha = alpha;
+/* ================================================= */
+/* 15. RÉINITIALISATION DE LA ROTATION              */
+/* ================================================= */
 
-    checkSteps();
-}
+/*
+   Appelée après le déverrouillage d'un cadenas.
 
+   La rotation cumulée revient à zéro.
+
+   La référence alpha est supprimée.
+
+   Le prochain événement du gyroscope servira
+   de nouvelle référence.
+
+   Le chronomètre n'est pas affecté.
+*/
 
 
 function resetRotation() {
+
     rotation = 0;
+
     startAlpha = null;
+
+    wrongDirectionCount = 0;
+
 }
+
+
+/* ================================================= */
+/* 16. GESTION CENTRALE DES ÉCHECS                  */
+/* ================================================= */
+
+/*
+   Toutes les causes d'échec passent par cette fonction.
+
+   Causes possibles :
+
+   timeout       : temps écoulé
+   wrongDirection: mauvaise manipulation
+   interruption : page mise en arrière-plan
+   sensorError   : gyroscope indisponible ou refusé
+
+   La fonction ne peut être exécutée qu'une seule fois
+   pour une même tentative.
+*/
+
+
+function endGame(reason) {
+
+    // Protection contre les doubles échecs
+    if (gameState !== "playing") {
+
+        return;
+
+    }
+
+
+    // Passage immédiat à l'état d'échec
+    // Les événements gyroscopiques suivants seront ignorés.
+    gameState = "failed";
+
+
+    // Mémorisation du motif
+    lastFailureReason = reason;
+
+
+    // Arrêt des temporisations
+    stopTimers();
+
+
+    // Réinitialisation de toutes les variables de tentative
+    resetAttemptVariables();
+
+
+    // Réinitialisation de l'affichage des cadenas
+    createLocks();
+
+
+    // Réinitialisation de l'affichage du chronomètre
+    updateChronoDisplay();
+
+
+    // Affichage du message d'échec
+    consigneElement.innerText = "La serrure se bloque.";
+
+
+    // Le bouton reste masqué pendant le blocage
+    startButton.style.display = "none";
+
+
+    /*
+       Délai de deux secondes.
+
+       À la fin du délai :
+       - le jeu revient à l'état ready ;
+       - la consigne initiale est restaurée ;
+       - le bouton START redevient visible.
+    */
+
+
+    resetTimeout = setTimeout(() => {
+
+
+        // Protection contre une sortie inattendue
+        if (gameState !== "failed") {
+
+            return;
+
+        }
+
+
+        // Retour à l'état initial
+        gameState = "ready";
+
+
+        // Réinitialisation de l'affichage
+        consigneElement.innerText =
+            "La serrure semble grippée. Manipulez-la avec précision.";
+
+
+        // Réactivation du bouton
+        startButton.style.display = "inline-block";
+
+
+        // Le délai est terminé
+        resetTimeout = null;
+
+    }, 2000);
+
+}
+
+
+/* ================================================= */
+/* 17. INITIALISATION DU GYROSCOPE                  */
+/* ================================================= */
+
+/*
+   L'écouteur deviceorientation est enregistré
+   une seule fois.
+
+   Il reste enregistré pendant toute la vie de la page.
+
+   Lors des tentatives suivantes, on ne crée pas
+   de nouvel écouteur.
+
+   Sur certains appareils, une autorisation explicite
+   est nécessaire.
+*/
+
+
+async function initMotion() {
+
+    // Si une initialisation est déjà en cours
+    if (motionInitializationPending) {
+
+        return false;
+
+    }
+
+
+    // Si le gyroscope est déjà initialisé
+    if (orientationListenerRegistered) {
+
+        return true;
+
+    }
+
+
+    // Vérification de la disponibilité du gyroscope
+    if (typeof DeviceOrientationEvent === "undefined") {
+
+        return false;
+
+    }
+
+
+    motionInitializationPending = true;
+
+
+    try {
+
+
+        /*
+           Certains navigateurs nécessitent
+           une autorisation explicite.
+
+           La demande doit être faite à la suite
+           d'une interaction utilisateur.
+        */
+
+
+        if (
+
+            typeof DeviceOrientationEvent.requestPermission === "function"
+
+        ) {
+
+            const response =
+                await DeviceOrientationEvent.requestPermission();
+
+
+            // Autorisation refusée
+            if (response !== "granted") {
+
+                return false;
+
+            }
+
+        }
+
+
+        /*
+           Enregistrement unique de l'écouteur.
+
+           La protection orientationListenerRegistered
+           empêche tout ajout supplémentaire.
+        */
+
+
+        if (!orientationListenerRegistered) {
+
+            window.addEventListener(
+                "deviceorientation",
+                handleOrientation
+            );
+
+            orientationListenerRegistered = true;
+
+        }
+
+
+        return true;
+
+    } catch (error) {
+
+        console.warn("Erreur gyroscope :", error);
+
+        return false;
+
+    } finally {
+
+        motionInitializationPending = false;
+
+    }
+
+}
+
+
+/* ================================================= */
+/* 18. SURVEILLANCE DU GYROSCOPE                    */
+/* ================================================= */
+
+/*
+   Après le démarrage, le jeu attend une première
+   valeur alpha valide.
+
+   Le chronomètre fonctionne déjà pendant cette attente.
+
+   Si aucune valeur n'est reçue dans les trois secondes,
+   la tentative est considérée comme un échec technique.
+*/
+
+
+function startSensorWatchdog() {
+
+    // Suppression d'un ancien délai
+    clearTimeout(sensorTimeout);
+
+
+    // Pas besoin de surveillance si le capteur est prêt
+    if (sensorReady) {
+
+        return;
+
+    }
+
+
+    sensorTimeout = setTimeout(() => {
+
+
+        // Vérification de l'état du jeu
+        if (gameState !== "playing") {
+
+            return;
+
+        }
+
+
+        // Le capteur doit avoir fourni une première mesure
+        if (!sensorReady) {
+
+            endGame("sensorError");
+
+        }
+
+    }, 3000);
+
+}
+
+
+/* ================================================= */
+/* 19. TRAITEMENT DES ÉVÉNEMENTS DU GYROSCOPE        */
+/* ================================================= */
+
+/*
+   Fonction centrale de détection des mouvements.
+
+   Elle est appelée à chaque événement deviceorientation.
+
+   Aucun mouvement n'est traité lorsque le jeu
+   n'est pas dans l'état playing.
+*/
+
+
+function handleOrientation(event) {
+
+
+    // Protection : le jeu doit être actif
+    if (gameState !== "playing") {
+
+        return;
+
+    }
+
+
+    // Récupération de l'orientation horizontale
+    const alpha = event.alpha;
+
+
+    // Vérification de la validité de la mesure
+    if (alpha === null || alpha === undefined ||
+        !Number.isFinite(alpha)) {
+
+        return;
+
+    }
+
+
+    /*
+       PREMIÈRE MESURE
+
+       La première valeur alpha sert uniquement
+       à initialiser la référence.
+
+       Elle ne représente aucun mouvement.
+    */
+
+
+    if (startAlpha === null) {
+
+        startAlpha = alpha;
+
+        sensorReady = true;
+
+
+        // Le capteur est opérationnel
+        clearTimeout(sensorTimeout);
+
+        sensorTimeout = null;
+
+
+        return;
+
+    }
+
+
+    /*
+       CALCUL DU DÉPLACEMENT
+
+       On compare l'orientation actuelle
+       à la dernière orientation de référence.
+    */
+
+
+    let delta = alpha - startAlpha;
+
+
+    /*
+       NORMALISATION ANGULAIRE
+
+       Correction du passage entre 0 et 360 degrés.
+
+       Exemple :
+       350 -> 10 devient +20 degrés.
+
+       10 -> 350 devient -20 degrés.
+    */
+
+
+    if (delta > 180) {
+
+        delta -= 360;
+
+    }
+
+    if (delta < -180) {
+
+        delta += 360;
+
+    }
+
+
+    /*
+       SEUIL MINIMUM
+
+       Les mouvements inférieurs à 10 degrés
+       sont ignorés.
+
+       La référence n'est pas actualisée ici :
+       les petits mouvements peuvent donc se cumuler
+       jusqu'à atteindre le seuil.
+    */
+
+
+    if (Math.abs(delta) < movementThreshold) {
+
+        return;
+
+    }
+
+
+    // Vérification de l'état avant tout nouveau traitement
+    if (gameState !== "playing") {
+
+        return;
+
+    }
+
+
+    // Récupération de la rotation attendue
+    const target = stepsConfig[currentStep];
+
+
+    /*
+       DÉTECTION DU MAUVAIS SENS
+
+       Une rotation positive exige un mouvement positif.
+
+       Une rotation négative exige un mouvement négatif.
+
+       Tout mouvement inverse alimente le compteur d'erreurs.
+    */
+
+
+    if (
+
+        (target > 0 && delta < 0) ||
+
+        (target < 0 && delta > 0)
+
+    ) {
+
+
+        // Cumul du mouvement incorrect
+        wrongDirectionCount += Math.abs(delta);
+
+
+        /*
+           Actualisation de la référence.
+
+           IMPORTANT :
+
+           Cela empêche de comptabiliser plusieurs fois
+           le même déplacement.
+        */
+
+
+        startAlpha = alpha;
+
+
+        // Petite vibration de signalement
+        if (navigator.vibrate) {
+
+            navigator.vibrate(20);
+
+        }
+
+
+        /*
+           Vérification de la tolérance.
+
+           À 30 degrés cumulés ou davantage,
+           la serrure se bloque.
+        */
+
+
+        if (wrongDirectionCount >= wrongTolerance) {
+
+            endGame("wrongDirection");
+
+        }
+
+
+        return;
+
+    }
+
+
+    /*
+       MOUVEMENT CORRECT
+
+       Le joueur tourne dans le bon sens.
+
+       Le compteur d'erreurs consécutives est remis à zéro.
+    */
+
+
+    wrongDirectionCount = 0;
+
+
+    // Ajout de la rotation correcte
+    rotation += delta;
+
+
+    // Actualisation de la référence
+    startAlpha = alpha;
+
+
+    // Vérification de la progression
+    checkSteps();
+
+}
+
+
+/* ================================================= */
+/* 20. VÉRIFICATION DE LA ROTATION                  */
+/* ================================================= */
+
+/*
+   Vérifie si la rotation nécessaire au cadenas
+   actuel a été atteinte.
+
+   Un dépassement de la valeur cible est accepté.
+*/
+
 
 function checkSteps() {
 
-    if (currentStep >= totalSteps) return;
 
+    // Protection contre les traitements après arrêt
+    if (gameState !== "playing") {
+
+        return;
+
+    }
+
+
+    // Vérification de la progression
+    if (currentStep >= totalSteps) {
+
+        return;
+
+    }
+
+
+    // Rotation attendue
     const target = stepsConfig[currentStep];
 
+
+    // Vérification du sens et de la valeur
     if (
+
         (target > 0 && rotation >= target) ||
+
         (target < 0 && rotation <= target)
+
     ) {
+
         unlockStep();
+
     }
+
 }
+
+
+/* ================================================= */
+/* 21. DÉVERROUILLAGE D'UN CADENAS                  */
+/* ================================================= */
+
+/*
+   Appelée lorsque la rotation attendue est atteinte.
+
+   Elle valide visuellement le cadenas et passe
+   au suivant.
+*/
 
 
 function unlockStep() {
 
+
+    // Protection contre un traitement après arrêt
+    if (gameState !== "playing") {
+
+        return;
+
+    }
+
+
+    // Récupération du cadenas actuel
     const lock = document.getElementById("lock-" + currentStep);
+
+
+    // Sécurité : le cadenas doit exister
+    if (!lock) {
+
+        return;
+
+    }
+
+
+    // Validation visuelle
     lock.innerText = "✅";
+
     lock.style.color = "#4CAF50";
+
     lock.style.transform = "scale(1.2)";
 
+
+    // Son de validation
     playClickSound();
 
+
+    // Passage au cadenas suivant
     currentStep++;
-    resetRotation();
+
+
+    /*
+       Si tous les cadenas sont ouverts,
+       la serrure est immédiatement déverrouillée.
+    */
+
 
     if (currentStep >= totalSteps) {
+
         unlockDoor();
+
+        return;
+
     }
+
+
+    /*
+       Il reste des cadenas.
+
+       On réinitialise la rotation et la référence alpha.
+
+       Le chronomètre continue normalement.
+    */
+
+
+    resetRotation();
+
 }
 
 
-/* ============================= */
-/*  SUCCÈS                       */
-/* ============================= */
+/* ================================================= */
+/* 22. CONSTRUCTION DE L'URL CALLBACK               */
+/* ================================================= */
 
-/*function unlockDoor() {
+/*
+   Construit l'adresse de retour vers Wix.
 
-    gameActive = false;
-    clearInterval(timer);
+   Les paramètres existants sont conservés.
 
-    document.getElementById("consigne").innerText =
-        "Un déclic profond se fait entendre...";
+   Les valeurs absentes ne sont pas remplacées
+   par les chaînes "null" ou "undefined".
 
-    setTimeout(() => {
-        let destination = "";
+   Une adresse callback invalide est refusée.
+*/
 
-		if(settings.returnPage === "avocat"){
-    		destination = "17-avocat-int";
-		}
 
-		if(settings.returnPage === "journaliste"){
-    		destination = "17-journaliste-int";
-		}
+function buildCallbackUrl() {
 
-		window.location.href =
-		`https://hochardxavier5.wixsite.com/scl-v1/${destination}?group=${settings.group}&unlock=${serrure}`;
-    }, 1500);
-}*/
+
+    // Le callback est indispensable à la redirection
+    if (!settings.callback) {
+
+        return null;
+
+    }
+
+
+    try {
+
+
+        // Création de l'URL
+        const url = new URL(
+            settings.callback,
+            window.location.href
+        );
+
+
+        // Ajout des paramètres disponibles
+        if (settings.group) {
+
+            url.searchParams.set("group", settings.group);
+
+        }
+
+        if (settings.unlock) {
+
+            url.searchParams.set("unlock", settings.unlock);
+
+        }
+
+        if (settings.target) {
+
+            url.searchParams.set("target", settings.target);
+
+        }
+
+        if (settings.scene) {
+
+            url.searchParams.set("scene", settings.scene);
+
+        }
+
+
+        return url.toString();
+
+    } catch (error) {
+
+        console.error("URL callback invalide :", error);
+
+        return null;
+
+    }
+
+}
+
+
+/* ================================================= */
+/* 23. RÉUSSITE : OUVERTURE DE LA SERRURE           */
+/* ================================================= */
+
+/*
+   Appelée lorsque tous les cadenas sont ouverts.
+
+   La réussite est distincte de l'échec.
+
+   Aucun délai de deux secondes n'est appliqué.
+
+   Le callback Wix est déclenché immédiatement.
+*/
+
 
 function unlockDoor() {
 
-    gameActive = false;
-    clearInterval(timer);
 
-    const url = new URL(settings.callback);
+    // Protection contre une double réussite
+    if (gameState !== "playing") {
 
-    url.searchParams.set("group", settings.group);
-    url.searchParams.set("unlock", settings.unlock);
-	url.searchParams.set("target", settings.target); // 👈 IMPORTANT
-	url.searchParams.set("scene", settings.scene);
+        return;
 
-    window.location.href = url.toString();
-}
-
-/* ============================= */
-/*  DÉMARRAGE                    */
-/* ============================= */
-
-function initMotion() {
-
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function') {
-
-        DeviceOrientationEvent.requestPermission()
-            .then(response => {
-                if (response === 'granted') {
-                    window.addEventListener("deviceorientation", handleOrientation);
-                }
-            });
-
-    } else {
-        window.addEventListener("deviceorientation", handleOrientation);
     }
+
+
+    if (callbackTriggered) {
+
+        return;
+
+    }
+
+
+    // Passage à l'état de réussite
+    gameState = "success";
+
+
+    // Protection contre les doubles redirections
+    callbackTriggered = true;
+
+
+    // Arrêt de tous les timers
+    stopTimers();
+
+
+    // Construction du callback
+    const destination = buildCallbackUrl();
+
+
+    /*
+       Si le callback est absent ou invalide,
+       la serrure reste ouverte.
+
+       On ne déclenche pas une fausse redirection.
+    */
+
+
+    if (!destination) {
+
+        consigneElement.innerText =
+            "Serrure ouverte, mais retour impossible.";
+
+        console.error(
+            "Callback absent ou invalide. Vérifier les paramètres URL."
+        );
+
+        return;
+
+    }
+
+
+    // Redirection vers Wix
+    window.location.href = destination;
+
 }
 
-function startGame() {
 
-    document.getElementById("startBtn").style.display = "none";
-    document.getElementById("consigne").innerText = "";
+/* ================================================= */
+/* 24. DÉMARRAGE D'UNE PARTIE                       */
+/* ================================================= */
 
-    gameActive = true;
+/*
+   Fonction appelée par le bouton START.
+
+   Elle prépare une nouvelle tentative.
+
+   Le chronomètre démarre immédiatement au clic.
+
+   Le gyroscope est initialisé ensuite.
+
+   Si le gyroscope ne fournit aucune mesure valide
+   dans les trois secondes suivant son initialisation,
+   la tentative échoue.
+*/
+
+
+async function startGame() {
+
+
+    // Une partie ne peut démarrer que depuis l'état ready
+    if (gameState !== "ready") {
+
+        return;
+
+    }
+
+
+    /*
+       Passage immédiat à l'état playing.
+
+       Cette opération bloque un éventuel double clic
+       avant même l'initialisation du gyroscope.
+    */
+
+
+    gameState = "playing";
+
+
+    // Réinitialisation des variables de tentative
+    resetAttemptVariables();
+
+
+    // Réinitialisation de l'affichage des cadenas
+    createLocks();
+
+
+    // Réinitialisation du chronomètre visuel
+    updateChronoDisplay();
+
+
+    // Masquage du bouton START
+    startButton.style.display = "none";
+
+
+    // Effacement de la consigne
+    consigneElement.innerText = "";
+
+
+    /*
+       DÉMARRAGE IMMÉDIAT DU CHRONOMÈTRE
+
+       Le décompte ne dépend pas de la réponse
+       du gyroscope.
+    */
+
+
     startTimer();
-    initMotion();
+
+
+    /*
+       INITIALISATION DU GYROSCOPE
+
+       L'écouteur est créé uniquement s'il n'existe pas déjà.
+    */
+
+
+    const motionAvailable = await initMotion();
+
+
+    /*
+       Vérification de l'état.
+
+       Si un échec a été déclenché pendant l'initialisation,
+       on ne poursuit pas.
+    */
+
+
+    if (gameState !== "playing") {
+
+        return;
+
+    }
+
+
+    // Autorisation ou initialisation impossible
+    if (!motionAvailable) {
+
+        endGame("sensorError");
+
+        return;
+
+    }
+
+
+    /*
+       SURVEILLANCE DU CAPTEUR
+
+       Si la première mesure alpha n'a pas encore été reçue,
+       on lance le délai de trois secondes.
+    */
+
+
+    if (!sensorReady) {
+
+        startSensorWatchdog();
+
+    }
+
 }
 
-document.getElementById("startBtn")
-    .addEventListener("click", startGame);
 
-createLocks();
+/* ================================================= */
+/* 25. GESTION DES INTERRUPTIONS                    */
+/* ================================================= */
 
+/*
+   Si le joueur quitte la page ou la met en arrière-plan
+   pendant une tentative, celle-ci est considérée
+   comme un échec.
+
+   La partie ne reprend pas automatiquement.
+*/
+
+
+document.addEventListener("visibilitychange", () => {
+
+
+    // La page est devenue invisible
+    if (document.hidden && gameState === "playing") {
+
+        endGame("interruption");
+
+    }
+
+});
+
+
+/*
+   pagehide complète la gestion des interruptions.
+
+   Cela couvre notamment les situations où la page
+   est quittée ou placée dans le cache de navigation.
+
+   La protection de endGame() évite un double échec
+   si visibilitychange a déjà été traité.
+*/
+
+
+window.addEventListener("pagehide", () => {
+
+    if (gameState === "playing") {
+
+        endGame("interruption");
+
+    }
+
+});
+
+
+/* ================================================= */
+/* 26. BOUTON DE TEST DU CALLBACK                   */
+/* ================================================= */
+
+/*
+   Permet de vérifier le retour vers Wix sans
+   déverrouiller réellement les cadenas.
+
+   Il conserve les paramètres disponibles.
+*/
+
+
+debugButton.addEventListener("click", function () {
+
+
+    // Vérification de l'identifiant de l'équipe
+    if (!settings.group) {
+
+        alert("Aucun group détecté dans l'URL.");
+
+        return;
+
+    }
+
+
+    // Vérification du callback
+    const destination = buildCallbackUrl();
+
+
+    if (!destination) {
+
+        alert("Callback absent ou invalide.");
+
+        return;
+
+    }
+
+
+    /*
+       Arrêt du jeu si le bouton de test est utilisé
+       pendant une tentative.
+    */
+
+    if (gameState === "playing") {
+
+        gameState = "success";
+
+        stopTimers();
+
+    }
+
+
+    // Protection contre un double clic
+    if (callbackTriggered) {
+
+        return;
+
+    }
+
+    callbackTriggered = true;
+
+
+    // Redirection de test
+    window.location.href = destination;
+
+});
+
+
+/* ================================================= */
+/* 27. ASSOCIATION DU BOUTON START                  */
+/* ================================================= */
+
+/*
+   Le bouton est associé à startGame() une seule fois.
+
+   La protection gameState empêche les doubles démarrages.
+*/
+
+
+startButton.addEventListener("click", startGame);
+
+
+/* ================================================= */
+/* 28. INITIALISATION DE LA PAGE                    */
+/* ================================================= */
+
+/*
+   Cette partie est exécutée une seule fois
+   lors du chargement de la page.
+
+   Elle prépare l'interface et les variables.
+
+   Le jeu reste inactif jusqu'au clic sur START.
+*/
+
+
+function initGame() {
+
+
+    // État initial
+    gameState = "ready";
+
+
+    // Initialisation des variables
+    resetAttemptVariables();
+
+
+    // Création des cadenas
+    createLocks();
+
+
+    // Affichage du temps initial
+    updateChronoDisplay();
+
+
+    // Affichage de la consigne initiale
+    consigneElement.innerText =
+        "La serrure semble grippée. Manipulez-la avec précision.";
+
+
+    // Activation du bouton START
+    startButton.style.display = "inline-block";
+
+
+    // Aucun chronomètre actif
+    stopTimers();
+
+}
+
+
+// Lancement de l'initialisation
+initGame();
 
 
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
